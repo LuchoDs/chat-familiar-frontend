@@ -9,6 +9,9 @@ const MAX_RECONNECT = 10000; // máximo tiempo de reconexión
 let mediaRecorder = null;
 let audioChunks = [];
 
+// URL del backend en Render
+const BASE_URL = "https://chat-familiar-backend-spp8.onrender.com";
+
 const loginBtn = document.getElementById("login-btn");
 const logoutBtn = document.getElementById("logout-btn");
 const sendBtn = document.getElementById("send-btn");
@@ -77,7 +80,7 @@ function habilitarOpcionesMensajes() {
         msg.addEventListener("touchstart", e => {
             pressTimer = setTimeout(() => {
                 mostrarMenuEliminar(msg);
-            }, 600); // 600ms touch largo
+            }, 600);
         });
 
         msg.addEventListener("touchend", e => clearTimeout(pressTimer));
@@ -99,9 +102,8 @@ function mostrarMenuEliminar(msgElement) {
 
     const rect = msgElement.getBoundingClientRect();
 
-    // Ajuste para que el menú no se salga de la pantalla
-    const menuWidth = 80;  // ancho estimado
-    const menuHeight = 30; // alto estimado
+    const menuWidth = 80;
+    const menuHeight = 30;
     const pageWidth = window.innerWidth;
     const pageHeight = window.innerHeight;
 
@@ -120,7 +122,7 @@ function mostrarMenuEliminar(msgElement) {
         if (!messageId) return;
 
         try {
-            const response = await fetchConAuth(`http://127.0.0.1:8000/messages/${messageId}`, {
+            const response = await fetchConAuth(`${BASE_URL}/messages/${messageId}`, {
                 method: "DELETE"
             });
 
@@ -154,7 +156,7 @@ function conectarSocket() {
         return;
     }
 
-    socket = new WebSocket(`ws://127.0.0.1:8000/ws?token=${token}`);
+    socket = new WebSocket(`wss://chat-familiar-backend-spp8.onrender.com/ws?token=${token}`);
 
     socket.onopen = () => {
         console.log("WebSocket conectado");
@@ -201,7 +203,7 @@ function conectarSocket() {
 // CARGAR MENSAJES INICIALES
 // =========================
 async function cargarMensajesIniciales() {
-    const response = await fetchConAuth("http://127.0.0.1:8000/messages");
+    const response = await fetchConAuth(`${BASE_URL}/messages`);
     if (!response) return;
 
     const messages = await response.json();
@@ -237,7 +239,7 @@ window.addEventListener("load", async () => {
     if (!token) return;
 
     try {
-        const response = await fetchConAuth("http://127.0.0.1:8000/me");
+        const response = await fetchConAuth(`${BASE_URL}/me`);
         if (!response) return;
 
         const userData = await response.json();
@@ -274,7 +276,7 @@ loginBtn.addEventListener("click", async (e) => {
     formData.append("password", password);
 
     try {
-        const response = await fetch("http://127.0.0.1:8000/login", {
+        const response = await fetch(`${BASE_URL}/login`, {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body: formData
@@ -337,7 +339,7 @@ recordBtn.addEventListener("click", async () => {
             formData.append("file", audioBlob, `audio_${Date.now()}.webm`);
 
             try {
-                const response = await fetchConAuth("http://127.0.0.1:8000/upload-audio", {
+                const response = await fetchConAuth(`${BASE_URL}/upload-audio`, {
                     method: "POST",
                     body: formData
                 });

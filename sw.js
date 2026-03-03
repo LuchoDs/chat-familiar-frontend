@@ -18,28 +18,30 @@ self.addEventListener("install", event => {
   );
 });
 
-// Activación del SW y limpieza de caches viejos
+// Activación del SW y limpieza de todos los caches viejos
 self.addEventListener("activate", event => {
-  console.log("[SW] Activado");
+  console.log("[SW] Activado y limpiando caches");
   event.waitUntil(
-    caches.keys().then(keys => {
-      return Promise.all(
-        keys.map(key => {
-          if (key !== CACHE_NAME) {
-            console.log("[SW] Borrando cache vieja:", key);
-            return caches.delete(key);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
+    caches.keys().then(keys => 
+      Promise.all(keys.map(key => caches.delete(key)))
+    ).then(() => self.clients.claim())
   );
 });
 
-// Interceptar fetch y responder con cache primero
+// Interceptar fetch y siempre intentar actualizar desde red primero
 self.addEventListener("fetch", event => {
   event.respondWith(
-    caches.match(event.request).then(response => {
-      return response || fetch(event.request);
-    })
+    fetch(event.request)
+      .then(response => {
+        // Guardar en cache la nueva versión
+        return caches.open(CACHE_NAME).then(cache => {
+          cache.put(event.request, response.clone());
+          return response;
+        });
+      })
+      .catch(() => {
+        // Si no hay red, servir del cache si existe
+        return caches.match(event.request);
+      })
   );
 });
