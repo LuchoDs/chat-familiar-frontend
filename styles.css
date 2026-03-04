@@ -1,4 +1,4 @@
-/* =========================
+/* ========================= 
    RESET
 ========================= */
 * {
@@ -116,9 +116,15 @@ header h2 {
 }
 
 /* Mensajes propios */
-#messages div.user-self {
+#messages div.my-message {
     background-color: #dcf8c6;
     align-self: flex-end;
+}
+
+/* Mensajes de otros */
+#messages div.other-message {
+    background-color: #fff;
+    align-self: flex-start;
 }
 
 /* =========================

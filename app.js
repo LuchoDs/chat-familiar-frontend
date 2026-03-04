@@ -147,6 +147,50 @@ function mostrarMenuEliminar(msgElement) {
 }
 
 // =========================
+// FUNCION AUXILIAR: CREAR MENSAJE HTML
+// =========================
+function crearMensajeElemento(data) {
+    const msg = document.createElement("div");
+    msg.dataset.id = data.id;
+
+    const sender = data.username || `Usuario ${data.user_id}`;
+    const esPropio = (data.username === usernameGlobal || data.user_id === window.userId);
+
+    msg.classList.add(esPropio ? "my-message" : "other-message");
+
+    if (data.content) {
+        msg.textContent = `${sender}: ${data.content}`;
+    } else if (data.audio_url) {
+        const audio = document.createElement("audio");
+        audio.controls = true;
+        audio.src = data.audio_url;
+        msg.appendChild(document.createTextNode(`${sender}: `));
+        msg.appendChild(audio);
+    }
+
+    return msg;
+}
+
+// =========================
+// CARGAR MENSAJES INICIALES
+// =========================
+async function cargarMensajesIniciales() {
+    const response = await fetchConAuth(`${BASE_URL}/messages`);
+    if (!response) return;
+
+    const messages = await response.json();
+    messagesDiv.innerHTML = "";
+
+    messages.forEach(data => {
+        const msg = crearMensajeElemento(data);
+        messagesDiv.appendChild(msg);
+    });
+
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    habilitarOpcionesMensajes();
+}
+
+// =========================
 // CONECTAR WEBSOCKET CON RECONEXIÓN
 // =========================
 function conectarSocket() {
@@ -165,20 +209,7 @@ function conectarSocket() {
 
     socket.onmessage = (event) => {
         const data = JSON.parse(event.data);
-
-        const msg = document.createElement("div");
-        msg.dataset.id = data.id;
-        const sender = data.username || `Usuario ${data.user_id}`;
-
-        if (data.content) {
-            msg.textContent = `${sender}: ${data.content}`;
-        } else if (data.audio_url) {
-            const audio = document.createElement("audio");
-            audio.controls = true;
-            audio.src = data.audio_url;
-            msg.appendChild(document.createTextNode(`${sender}: `));
-            msg.appendChild(audio);
-        }
+        const msg = crearMensajeElemento(data);
 
         messagesDiv.appendChild(msg);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
@@ -197,38 +228,6 @@ function conectarSocket() {
         console.log("Error en WebSocket", err);
         socket.close();
     };
-}
-
-// =========================
-// CARGAR MENSAJES INICIALES
-// =========================
-async function cargarMensajesIniciales() {
-    const response = await fetchConAuth(`${BASE_URL}/messages`);
-    if (!response) return;
-
-    const messages = await response.json();
-    messagesDiv.innerHTML = "";
-
-    messages.forEach(data => {
-        const msg = document.createElement("div");
-        msg.dataset.id = data.id;
-        const sender = data.username || `Usuario ${data.user_id}`;
-
-        if (data.content) {
-            msg.textContent = `${sender}: ${data.content}`;
-        } else if (data.audio_url) {
-            const audio = document.createElement("audio");
-            audio.controls = true;
-            audio.src = data.audio_url;
-            msg.appendChild(document.createTextNode(`${sender}: `));
-            msg.appendChild(audio);
-        }
-
-        messagesDiv.appendChild(msg);
-    });
-
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    habilitarOpcionesMensajes();
 }
 
 // =========================
@@ -263,7 +262,6 @@ window.addEventListener("load", async () => {
 loginBtn.addEventListener("click", async (e) => {
     e.preventDefault();
 
-    // === Check conexión ===
     if (!navigator.onLine) {
         alert("Sin conexión. Conectate a internet para iniciar sesión.");
         return;
