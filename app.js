@@ -101,7 +101,6 @@ function mostrarMenuEliminar(msgElement) {
     document.body.appendChild(menu);
 
     const rect = msgElement.getBoundingClientRect();
-
     const menuWidth = 80;
     const menuHeight = 30;
     const pageWidth = window.innerWidth;
@@ -147,6 +146,41 @@ function mostrarMenuEliminar(msgElement) {
 }
 
 // =========================
+// CREAR ELEMENTO MENSAJE
+// =========================
+function crearMensajeElement(data) {
+    const msg = document.createElement("div");
+    msg.dataset.id = data.id;
+    const sender = data.username || `Usuario ${data.user_id}`;
+
+    // Asignar clase para alinear según sea mensaje propio o de otro
+    if (sender === usernameGlobal) {
+        msg.classList.add("user-self");
+    } else {
+        msg.classList.add("user-other");
+    }
+
+    // Nombre en negrita
+    const senderSpan = document.createElement("span");
+    senderSpan.style.fontWeight = "bold";
+    senderSpan.textContent = `${sender}: `;
+    msg.appendChild(senderSpan);
+
+    if (data.content) {
+        const contentSpan = document.createElement("span");
+        contentSpan.textContent = data.content;
+        msg.appendChild(contentSpan);
+    } else if (data.audio_url) {
+        const audio = document.createElement("audio");
+        audio.controls = true;
+        audio.src = data.audio_url;
+        msg.appendChild(audio);
+    }
+
+    return msg;
+}
+
+// =========================
 // CONECTAR WEBSOCKET CON RECONEXIÓN
 // =========================
 function conectarSocket() {
@@ -165,7 +199,12 @@ function conectarSocket() {
 
     socket.onmessage = (event) => {
         const data = JSON.parse(event.data);
-        mostrarMensaje(data);
+
+        const msg = crearMensajeElement(data);
+        messagesDiv.appendChild(msg);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+        habilitarOpcionesMensajes();
     };
 
     socket.onclose = () => {
@@ -182,40 +221,6 @@ function conectarSocket() {
 }
 
 // =========================
-// FUNCION PARA MOSTRAR MENSAJE (TEXTO / AUDIO) CON NOMBRE EN NEGRITA Y ALINEACIÓN
-// =========================
-function mostrarMensaje(data) {
-    const msg = document.createElement("div");
-    msg.dataset.id = data.id;
-    const sender = data.username || `Usuario ${data.user_id}`;
-
-    // Determinar si es propio
-    const esPropio = sender === usernameGlobal;
-    if (esPropio) msg.classList.add("user-self");
-
-    // Crear span del nombre en negrita
-    const senderSpan = document.createElement("span");
-    senderSpan.style.fontWeight = "bold";
-    senderSpan.textContent = `${sender}: `;
-
-    msg.appendChild(senderSpan);
-
-    if (data.content) {
-        msg.appendChild(document.createTextNode(data.content));
-    } else if (data.audio_url) {
-        const audio = document.createElement("audio");
-        audio.controls = true;
-        audio.src = data.audio_url;
-        msg.appendChild(audio);
-    }
-
-    messagesDiv.appendChild(msg);
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-
-    habilitarOpcionesMensajes();
-}
-
-// =========================
 // CARGAR MENSAJES INICIALES
 // =========================
 async function cargarMensajesIniciales() {
@@ -226,8 +231,12 @@ async function cargarMensajesIniciales() {
     messagesDiv.innerHTML = "";
 
     messages.forEach(data => {
-        mostrarMensaje(data);
+        const msg = crearMensajeElement(data);
+        messagesDiv.appendChild(msg);
     });
+
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    habilitarOpcionesMensajes();
 }
 
 // =========================
@@ -262,6 +271,7 @@ window.addEventListener("load", async () => {
 loginBtn.addEventListener("click", async (e) => {
     e.preventDefault();
 
+    // === Check conexión ===
     if (!navigator.onLine) {
         alert("Sin conexión. Conectate a internet para iniciar sesión.");
         return;
