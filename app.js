@@ -263,6 +263,12 @@ window.addEventListener("load", async () => {
 loginBtn.addEventListener("click", async (e) => {
     e.preventDefault();
 
+    // === Check conexión ===
+    if (!navigator.onLine) {
+        alert("Sin conexión. Conectate a internet para iniciar sesión.");
+        return;
+    }
+
     const username = document.getElementById("username").value.trim();
     const password = document.getElementById("password").value.trim();
 
