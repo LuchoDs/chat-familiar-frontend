@@ -101,6 +101,7 @@ function mostrarMenuEliminar(msgElement) {
     document.body.appendChild(menu);
 
     const rect = msgElement.getBoundingClientRect();
+
     const menuWidth = 80;
     const menuHeight = 30;
     const pageWidth = window.innerWidth;
@@ -146,38 +147,47 @@ function mostrarMenuEliminar(msgElement) {
 }
 
 // =========================
-// CREAR ELEMENTO MENSAJE
+// FUNCION AUXILIAR: CREAR MENSAJE HTML
 // =========================
-function crearMensajeElement(data) {
+function crearMensajeElemento(data) {
     const msg = document.createElement("div");
     msg.dataset.id = data.id;
+
     const sender = data.username || `Usuario ${data.user_id}`;
+    const esPropio = (data.username === usernameGlobal || data.user_id === window.userId);
 
-    // Asignar clase para alinear según sea mensaje propio o de otro
-    if (sender === usernameGlobal) {
-        msg.classList.add("user-self");
-    } else {
-        msg.classList.add("user-other");
-    }
-
-    // Nombre en negrita
-    const senderSpan = document.createElement("span");
-    senderSpan.style.fontWeight = "bold";
-    senderSpan.textContent = `${sender}: `;
-    msg.appendChild(senderSpan);
+    msg.classList.add(esPropio ? "my-message" : "other-message");
 
     if (data.content) {
-        const contentSpan = document.createElement("span");
-        contentSpan.textContent = data.content;
-        msg.appendChild(contentSpan);
+        msg.textContent = `${sender}: ${data.content}`;
     } else if (data.audio_url) {
         const audio = document.createElement("audio");
         audio.controls = true;
         audio.src = data.audio_url;
+        msg.appendChild(document.createTextNode(`${sender}: `));
         msg.appendChild(audio);
     }
 
     return msg;
+}
+
+// =========================
+// CARGAR MENSAJES INICIALES
+// =========================
+async function cargarMensajesIniciales() {
+    const response = await fetchConAuth(`${BASE_URL}/messages`);
+    if (!response) return;
+
+    const messages = await response.json();
+    messagesDiv.innerHTML = "";
+
+    messages.forEach(data => {
+        const msg = crearMensajeElemento(data);
+        messagesDiv.appendChild(msg);
+    });
+
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    habilitarOpcionesMensajes();
 }
 
 // =========================
@@ -199,8 +209,8 @@ function conectarSocket() {
 
     socket.onmessage = (event) => {
         const data = JSON.parse(event.data);
+        const msg = crearMensajeElemento(data);
 
-        const msg = crearMensajeElement(data);
         messagesDiv.appendChild(msg);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
 
@@ -218,25 +228,6 @@ function conectarSocket() {
         console.log("Error en WebSocket", err);
         socket.close();
     };
-}
-
-// =========================
-// CARGAR MENSAJES INICIALES
-// =========================
-async function cargarMensajesIniciales() {
-    const response = await fetchConAuth(`${BASE_URL}/messages`);
-    if (!response) return;
-
-    const messages = await response.json();
-    messagesDiv.innerHTML = "";
-
-    messages.forEach(data => {
-        const msg = crearMensajeElement(data);
-        messagesDiv.appendChild(msg);
-    });
-
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    habilitarOpcionesMensajes();
 }
 
 // =========================
@@ -271,7 +262,6 @@ window.addEventListener("load", async () => {
 loginBtn.addEventListener("click", async (e) => {
     e.preventDefault();
 
-    // === Check conexión ===
     if (!navigator.onLine) {
         alert("Sin conexión. Conectate a internet para iniciar sesión.");
         return;
