@@ -147,50 +147,6 @@ function mostrarMenuEliminar(msgElement) {
 }
 
 // =========================
-// FUNCION AUXILIAR: CREAR MENSAJE HTML
-// =========================
-function crearMensajeElemento(data) {
-    const msg = document.createElement("div");
-    msg.dataset.id = data.id;
-
-    const sender = data.username || `Usuario ${data.user_id}`;
-    const esPropio = (data.username === usernameGlobal || data.user_id === window.userId);
-
-    msg.classList.add(esPropio ? "my-message" : "other-message");
-
-    if (data.content) {
-        msg.textContent = `${sender}: ${data.content}`;
-    } else if (data.audio_url) {
-        const audio = document.createElement("audio");
-        audio.controls = true;
-        audio.src = data.audio_url;
-        msg.appendChild(document.createTextNode(`${sender}: `));
-        msg.appendChild(audio);
-    }
-
-    return msg;
-}
-
-// =========================
-// CARGAR MENSAJES INICIALES
-// =========================
-async function cargarMensajesIniciales() {
-    const response = await fetchConAuth(`${BASE_URL}/messages`);
-    if (!response) return;
-
-    const messages = await response.json();
-    messagesDiv.innerHTML = "";
-
-    messages.forEach(data => {
-        const msg = crearMensajeElemento(data);
-        messagesDiv.appendChild(msg);
-    });
-
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    habilitarOpcionesMensajes();
-}
-
-// =========================
 // CONECTAR WEBSOCKET CON RECONEXIÓN
 // =========================
 function conectarSocket() {
@@ -209,12 +165,7 @@ function conectarSocket() {
 
     socket.onmessage = (event) => {
         const data = JSON.parse(event.data);
-        const msg = crearMensajeElemento(data);
-
-        messagesDiv.appendChild(msg);
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
-
-        habilitarOpcionesMensajes();
+        mostrarMensaje(data);
     };
 
     socket.onclose = () => {
@@ -228,6 +179,55 @@ function conectarSocket() {
         console.log("Error en WebSocket", err);
         socket.close();
     };
+}
+
+// =========================
+// FUNCION PARA MOSTRAR MENSAJE (TEXTO / AUDIO) CON NOMBRE EN NEGRITA Y ALINEACIÓN
+// =========================
+function mostrarMensaje(data) {
+    const msg = document.createElement("div");
+    msg.dataset.id = data.id;
+    const sender = data.username || `Usuario ${data.user_id}`;
+
+    // Determinar si es propio
+    const esPropio = sender === usernameGlobal;
+    if (esPropio) msg.classList.add("user-self");
+
+    // Crear span del nombre en negrita
+    const senderSpan = document.createElement("span");
+    senderSpan.style.fontWeight = "bold";
+    senderSpan.textContent = `${sender}: `;
+
+    msg.appendChild(senderSpan);
+
+    if (data.content) {
+        msg.appendChild(document.createTextNode(data.content));
+    } else if (data.audio_url) {
+        const audio = document.createElement("audio");
+        audio.controls = true;
+        audio.src = data.audio_url;
+        msg.appendChild(audio);
+    }
+
+    messagesDiv.appendChild(msg);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+    habilitarOpcionesMensajes();
+}
+
+// =========================
+// CARGAR MENSAJES INICIALES
+// =========================
+async function cargarMensajesIniciales() {
+    const response = await fetchConAuth(`${BASE_URL}/messages`);
+    if (!response) return;
+
+    const messages = await response.json();
+    messagesDiv.innerHTML = "";
+
+    messages.forEach(data => {
+        mostrarMensaje(data);
+    });
 }
 
 // =========================
