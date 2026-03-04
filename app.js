@@ -8,6 +8,7 @@ const MAX_RECONNECT = 10000; // máximo tiempo de reconexión
 
 let mediaRecorder = null;
 let audioChunks = [];
+let unreadCount = 0; // para badge
 
 // URL del backend en Render
 const BASE_URL = "https://chat-familiar-backend-spp8.onrender.com";
@@ -21,6 +22,15 @@ const messagesDiv = document.getElementById("messages");
 
 const loginView = document.getElementById("login-view");
 const chatView = document.getElementById("chat-view");
+
+// =========================
+// PERMISO NOTIFICACIONES
+// =========================
+window.addEventListener("load", () => {
+    if (Notification.permission !== "granted") {
+        Notification.requestPermission();
+    }
+});
 
 // =========================
 // FETCH CON AUTENTICACIÓN
@@ -61,9 +71,11 @@ function cerrarSesion() {
     }
 
     messagesDiv.innerHTML = "";
-
-    chatView.classList.add("hidden");
     loginView.classList.remove("hidden");
+    chatView.classList.add("hidden");
+
+    // limpiar badge
+    resetBadge();
 }
 
 // =========================
@@ -101,7 +113,6 @@ function mostrarMenuEliminar(msgElement) {
     document.body.appendChild(menu);
 
     const rect = msgElement.getBoundingClientRect();
-
     const menuWidth = 80;
     const menuHeight = 30;
     const pageWidth = window.innerWidth;
@@ -147,48 +158,31 @@ function mostrarMenuEliminar(msgElement) {
 }
 
 // =========================
-// FUNCION AUXILIAR: CREAR MENSAJE HTML
+// FUNCIONES DE BADGE
 // =========================
-function crearMensajeElemento(data) {
-    const msg = document.createElement("div");
-    msg.dataset.id = data.id;
-
-    const sender = data.username || `Usuario ${data.user_id}`;
-    const esPropio = (data.username === usernameGlobal || data.user_id === window.userId);
-
-    msg.classList.add(esPropio ? "my-message" : "other-message");
-
-    if (data.content) {
-        msg.textContent = `${sender}: ${data.content}`;
-    } else if (data.audio_url) {
-        const audio = document.createElement("audio");
-        audio.controls = true;
-        audio.src = data.audio_url;
-        msg.appendChild(document.createTextNode(`${sender}: `));
-        msg.appendChild(audio);
+function resetBadge() {
+    unreadCount = 0;
+    if ("clearAppBadge" in navigator) {
+        navigator.clearAppBadge().catch(() => {});
     }
+}
 
-    return msg;
+function incrementarBadge() {
+    unreadCount++;
+    if ("setAppBadge" in navigator) {
+        navigator.setAppBadge(unreadCount).catch(() => {});
+    }
 }
 
 // =========================
-// CARGAR MENSAJES INICIALES
+// LIMPIAR BADGE AL VER MENSAJES
 // =========================
-async function cargarMensajesIniciales() {
-    const response = await fetchConAuth(`${BASE_URL}/messages`);
-    if (!response) return;
-
-    const messages = await response.json();
-    messagesDiv.innerHTML = "";
-
-    messages.forEach(data => {
-        const msg = crearMensajeElemento(data);
-        messagesDiv.appendChild(msg);
-    });
-
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    habilitarOpcionesMensajes();
-}
+messagesDiv.addEventListener("click", () => {
+    resetBadge();
+});
+window.addEventListener("focus", () => {
+    resetBadge();
+});
 
 // =========================
 // CONECTAR WEBSOCKET CON RECONEXIÓN
@@ -209,12 +203,46 @@ function conectarSocket() {
 
     socket.onmessage = (event) => {
         const data = JSON.parse(event.data);
-        const msg = crearMensajeElemento(data);
+        const sender = data.username || `Usuario ${data.user_id}`;
+        const isSelf = sender === usernameGlobal;
+
+        // Crear el mensaje
+        const msg = document.createElement("div");
+        msg.dataset.id = data.id;
+        msg.classList.add(isSelf ? "user-self" : "user-other");
+
+        if (data.content) {
+            const usernameSpan = document.createElement("span");
+            usernameSpan.textContent = sender + ": ";
+            usernameSpan.style.fontWeight = "bold";
+            msg.appendChild(usernameSpan);
+            msg.appendChild(document.createTextNode(data.content));
+        } else if (data.audio_url) {
+            const audio = document.createElement("audio");
+            audio.controls = true;
+            audio.src = data.audio_url;
+
+            const usernameSpan = document.createElement("span");
+            usernameSpan.textContent = sender + ": ";
+            usernameSpan.style.fontWeight = "bold";
+            msg.appendChild(usernameSpan);
+            msg.appendChild(audio);
+        }
 
         messagesDiv.appendChild(msg);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
-
         habilitarOpcionesMensajes();
+
+        // Notificación y badge si no es tuyo
+        if (!isSelf) {
+            incrementarBadge();
+            if (Notification.permission === "granted") {
+                new Notification(`Nuevo mensaje de ${sender}`, {
+                    body: data.content || "Audio",
+                    icon: "icons/icon-192.png"
+                });
+            }
+        }
     };
 
     socket.onclose = () => {
@@ -228,6 +256,50 @@ function conectarSocket() {
         console.log("Error en WebSocket", err);
         socket.close();
     };
+}
+
+// =========================
+// CARGAR MENSAJES INICIALES
+// =========================
+async function cargarMensajesIniciales() {
+    const response = await fetchConAuth(`${BASE_URL}/messages`);
+    if (!response) return;
+
+    const messages = await response.json();
+    messagesDiv.innerHTML = "";
+
+    messages.forEach(data => {
+        const sender = data.username || `Usuario ${data.user_id}`;
+        const isSelf = sender === usernameGlobal;
+
+        const msg = document.createElement("div");
+        msg.dataset.id = data.id;
+        msg.classList.add(isSelf ? "user-self" : "user-other");
+
+        if (data.content) {
+            const usernameSpan = document.createElement("span");
+            usernameSpan.textContent = sender + ": ";
+            usernameSpan.style.fontWeight = "bold";
+            msg.appendChild(usernameSpan);
+            msg.appendChild(document.createTextNode(data.content));
+        } else if (data.audio_url) {
+            const audio = document.createElement("audio");
+            audio.controls = true;
+            audio.src = data.audio_url;
+
+            const usernameSpan = document.createElement("span");
+            usernameSpan.textContent = sender + ": ";
+            usernameSpan.style.fontWeight = "bold";
+            msg.appendChild(usernameSpan);
+            msg.appendChild(audio);
+        }
+
+        messagesDiv.appendChild(msg);
+    });
+
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    habilitarOpcionesMensajes();
+    resetBadge(); // al cargar mensajes iniciales
 }
 
 // =========================
@@ -287,7 +359,6 @@ loginBtn.addEventListener("click", async (e) => {
         });
 
         const data = await response.json();
-
         if (!response.ok) throw new Error(data.detail || "Error en login");
 
         localStorage.setItem("token", data.access_token);
@@ -315,7 +386,7 @@ logoutBtn.addEventListener("click", () => cerrarSesion());
 // =========================
 sendBtn.addEventListener("click", () => {
     const text = messageInput.value.trim();
-    if (text === "") return;
+    if (!text) return;
 
     if (!socket || socket.readyState !== WebSocket.OPEN) {
         alert("Conexión no disponible");
@@ -338,7 +409,6 @@ recordBtn.addEventListener("click", async () => {
         mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
         mediaRecorder.onstop = async () => {
             const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
-
             const formData = new FormData();
             formData.append("file", audioBlob, `audio_${Date.now()}.webm`);
 
