@@ -28,7 +28,6 @@ body {
     margin: 0 auto;
 }
 
-/* Oculta elementos */
 .hidden {
     display: none !important;
 }
@@ -106,34 +105,85 @@ header h2 {
     gap: 8px;
 }
 
+/* Fila contenedora */
+.message-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    position: relative;
+}
+
+/* Alineación */
+.message-row.self {
+    justify-content: flex-end;
+}
+
+.message-row.other {
+    justify-content: flex-start;
+}
+
 /* Burbuja base */
-#messages div {
+.bubble {
     padding: 10px 14px;
     border-radius: 12px;
-    max-width: 85%;
+    max-width: 75%;
     word-wrap: break-word;
-    background-color: white;
     box-shadow: 0 1px 1px rgba(0,0,0,0.1);
     font-size: 1.1rem;
     line-height: 1.2;
+    transition: transform 0.15s ease;
 }
 
-/* =========================
-   MENSAJES PROPIOS
-========================= */
-#messages div.user-self {
+/* Feedback visual cuando está en modo eliminar */
+.message-row.show-delete .bubble {
+    transform: scale(0.98);
+    opacity: 0.9;
+}
+
+/* Mensajes propios */
+.bubble-self {
     background-color: #dcf8c6;
-    align-self: flex-end;
-    border-bottom-right-radius: 4px; /* estilo tipo WhatsApp */
+    border-bottom-right-radius: 4px;
+}
+
+/* Mensajes ajenos */
+.bubble-other {
+    background-color: #ffffff;
+    border-bottom-left-radius: 4px;
+}
+
+/* Nombre en negrita */
+.username {
+    font-weight: bold;
 }
 
 /* =========================
-   MENSAJES DE OTROS
+   BOTÓN ELIMINAR
 ========================= */
-#messages div.user-other {
-    background-color: #ffffff;
-    align-self: flex-start;
-    border-bottom-left-radius: 4px; /* estilo tipo WhatsApp */
+
+.delete-btn {
+    font-size: 0.8rem;
+    color: #e76759;
+    cursor: pointer;
+    padding: 6px 8px;
+    user-select: none;
+    margin: 0 10px;
+    display: none;
+    font-weight: bold;
+    border-radius: 6px;
+    transition: background 0.2s ease;
+}
+
+/* Mostrar SOLO cuando JS agrega la clase */
+.message-row.show-delete .delete-btn {
+    display: block;
+}
+
+/* Hover solo para desktop */
+@media (hover: hover) {
+    .delete-btn:hover {
+        background: rgba(231, 103, 89, 0.15);
+    }
 }
 
 /* =========================
@@ -178,7 +228,7 @@ button:hover {
 }
 
 #send-btn {
-    font-size: 26x;
+    font-size: 26px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -192,7 +242,7 @@ button:hover {
 }
 
 /* =========================
-   RESPONSIVE MOBILE REAL
+   RESPONSIVE MOBILE
 ========================= */
 @media (max-width: 600px) {
 

@@ -21,14 +21,17 @@ const messagesDiv = document.getElementById("messages");
 const loginView = document.getElementById("login-view");
 const chatView = document.getElementById("chat-view");
 
+// Long press
+let longPressTimer = null;
+const LONG_PRESS_DURATION = 600;
+let activeRow = null;
+
 
 // =========================
 // ENTER = SOLO SALTO DE LÍNEA
 // =========================
 messageInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-        return;
-    }
+    if (event.key === "Enter") return;
 });
 
 
@@ -77,33 +80,114 @@ function cerrarSesion() {
 
 
 // =========================
+// ELIMINAR MENSAJE
+// =========================
+async function eliminarMensaje(id) {
+    try {
+        await fetchConAuth(`${BASE_URL}/messages/${id}`, {
+            method: "DELETE"
+        });
+
+        const msgRow = document.querySelector(`.message-row[data-id='${id}']`);
+        if (msgRow) msgRow.remove();
+
+    } catch {
+        alert("No se pudo eliminar el mensaje");
+    }
+}
+
+
+// =========================
+// MOSTRAR / OCULTAR DELETE
+// =========================
+function mostrarDelete(row) {
+    ocultarDelete();
+    const btn = row.querySelector(".delete-btn");
+    if (btn) {
+        btn.style.display = "block";
+        activeRow = row;
+    }
+}
+
+function ocultarDelete() {
+    if (activeRow) {
+        const btn = activeRow.querySelector(".delete-btn");
+        if (btn) btn.style.display = "none";
+        activeRow = null;
+    }
+}
+
+// Ocultar si se toca fuera
+document.addEventListener("touchstart", (e) => {
+    if (activeRow && !activeRow.contains(e.target)) {
+        ocultarDelete();
+    }
+});
+
+
+// =========================
 // CREAR BURBUJA DE MENSAJE
 // =========================
 function agregarMensajeAlChat(data) {
     const sender = data.username || `Usuario ${data.user_id}`;
     const isSelf = sender === usernameGlobal;
 
-    const msg = document.createElement("div");
-    msg.dataset.id = data.id;
-    msg.classList.add(isSelf ? "user-self" : "user-other");
+    const row = document.createElement("div");
+    row.classList.add("message-row", isSelf ? "self" : "other");
+    row.dataset.id = data.id;
 
-    // Nombre en negrita
+    const deleteBtn = document.createElement("div");
+    deleteBtn.classList.add("delete-btn");
+    deleteBtn.textContent = "Eliminar";
+
+    deleteBtn.addEventListener("click", () => {
+        eliminarMensaje(data.id);
+    });
+
+    const bubble = document.createElement("div");
+    bubble.classList.add("bubble", isSelf ? "bubble-self" : "bubble-other");
+
     const usernameSpan = document.createElement("span");
+    usernameSpan.classList.add("username");
     usernameSpan.textContent = sender + ": ";
     usernameSpan.style.fontWeight = "bold";
-    msg.appendChild(usernameSpan);
+    bubble.appendChild(usernameSpan);
 
-    // Texto o audio
     if (data.content) {
-        msg.appendChild(document.createTextNode(data.content));
+        bubble.appendChild(document.createTextNode(data.content));
     } else if (data.audio_url) {
         const audio = document.createElement("audio");
         audio.controls = true;
         audio.src = data.audio_url;
-        msg.appendChild(audio);
+        bubble.appendChild(audio);
     }
 
-    messagesDiv.appendChild(msg);
+    if (isSelf) {
+        row.appendChild(deleteBtn);
+        row.appendChild(bubble);
+    } else {
+        row.appendChild(bubble);
+        row.appendChild(deleteBtn);
+    }
+
+    // =========================
+    // LONG PRESS (MOBILE)
+    // =========================
+    row.addEventListener("touchstart", () => {
+        longPressTimer = setTimeout(() => {
+            mostrarDelete(row);
+        }, LONG_PRESS_DURATION);
+    });
+
+    row.addEventListener("touchend", () => {
+        clearTimeout(longPressTimer);
+    });
+
+    row.addEventListener("touchmove", () => {
+        clearTimeout(longPressTimer);
+    });
+
+    messagesDiv.appendChild(row);
 }
 
 
@@ -125,9 +209,7 @@ function conectarSocket() {
 
     socket.onmessage = (event) => {
         const data = JSON.parse(event.data);
-
         agregarMensajeAlChat(data);
-
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
     };
 
@@ -237,7 +319,7 @@ logoutBtn.addEventListener("click", cerrarSesion);
 
 
 // =========================
-// ENVIAR MENSAJE (SOLO BOTÓN)
+// ENVIAR MENSAJE
 // =========================
 sendBtn.addEventListener("click", () => {
     const text = messageInput.value.trim();
