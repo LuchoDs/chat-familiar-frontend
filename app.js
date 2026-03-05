@@ -1,16 +1,14 @@
-// ========================= 
+// =========================  
 // VARIABLES GLOBALES
 // =========================
 let socket = null;
 let usernameGlobal = null;
-let reconnectInterval = 1000; // tiempo inicial reconexión en ms
-const MAX_RECONNECT = 10000; // máximo tiempo de reconexión
+let reconnectInterval = 1000;
+const MAX_RECONNECT = 10000;
 
 let mediaRecorder = null;
 let audioChunks = [];
-let unreadCount = 0; // para badge
 
-// URL del backend en Render
 const BASE_URL = "https://chat-familiar-backend-spp8.onrender.com";
 
 const loginBtn = document.getElementById("login-btn");
@@ -23,14 +21,16 @@ const messagesDiv = document.getElementById("messages");
 const loginView = document.getElementById("login-view");
 const chatView = document.getElementById("chat-view");
 
+
 // =========================
-// PERMISO NOTIFICACIONES
+// ENTER = SOLO SALTO DE LÍNEA
 // =========================
-window.addEventListener("load", () => {
-    if (Notification.permission !== "granted") {
-        Notification.requestPermission();
+messageInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+        return;
     }
 });
+
 
 // =========================
 // FETCH CON AUTENTICACIÓN
@@ -51,13 +51,13 @@ async function fetchConAuth(url, options = {}) {
     });
 
     if (response.status === 401) {
-        console.log("Token expirado. Cerrando sesión.");
         cerrarSesion();
         return;
     }
 
     return response;
 }
+
 
 // =========================
 // CERRAR SESIÓN
@@ -73,119 +73,42 @@ function cerrarSesion() {
     messagesDiv.innerHTML = "";
     loginView.classList.remove("hidden");
     chatView.classList.add("hidden");
-
-    // limpiar badge
-    resetBadge();
 }
 
-// =========================
-// MENÚ LONG PRESS PARA ELIMINAR
-// =========================
-function habilitarOpcionesMensajes() {
-    const mensajes = messagesDiv.querySelectorAll("div");
-
-    mensajes.forEach(msg => {
-        if (msg.dataset.longpress) return;
-
-        let pressTimer;
-
-        msg.addEventListener("touchstart", e => {
-            pressTimer = setTimeout(() => {
-                mostrarMenuEliminar(msg);
-            }, 600);
-        });
-
-        msg.addEventListener("touchend", e => clearTimeout(pressTimer));
-
-        msg.dataset.longpress = true;
-    });
-}
-
-function mostrarMenuEliminar(msgElement) {
-    const menu = document.createElement("div");
-    menu.style.position = "absolute";
-    menu.style.background = "#fff";
-    menu.style.border = "1px solid #ccc";
-    menu.style.padding = "5px";
-    menu.style.borderRadius = "5px";
-    menu.style.zIndex = 1000;
-    menu.textContent = "Eliminar";
-    document.body.appendChild(menu);
-
-    const rect = msgElement.getBoundingClientRect();
-    const menuWidth = 80;
-    const menuHeight = 30;
-    const pageWidth = window.innerWidth;
-    const pageHeight = window.innerHeight;
-
-    let left = rect.left;
-    let top = rect.top - menuHeight - 5;
-
-    if (left + menuWidth > pageWidth) left = pageWidth - menuWidth - 5;
-    if (left < 0) left = 5;
-    if (top < 0) top = rect.bottom + 5;
-
-    menu.style.left = `${left}px`;
-    menu.style.top = `${top}px`;
-
-    menu.addEventListener("click", async () => {
-        const messageId = msgElement.dataset.id;
-        if (!messageId) return;
-
-        try {
-            const response = await fetchConAuth(`${BASE_URL}/messages/${messageId}`, {
-                method: "DELETE"
-            });
-
-            if (!response.ok) throw new Error("No se pudo eliminar el mensaje");
-
-            msgElement.remove();
-        } catch (err) {
-            console.error(err);
-            alert("Error al eliminar mensaje");
-        } finally {
-            menu.remove();
-        }
-    });
-
-    const cerrarMenu = e => {
-        if (!menu.contains(e.target)) {
-            menu.remove();
-            document.removeEventListener("click", cerrarMenu);
-        }
-    };
-    document.addEventListener("click", cerrarMenu);
-}
 
 // =========================
-// FUNCIONES DE BADGE
+// CREAR BURBUJA DE MENSAJE
 // =========================
-function resetBadge() {
-    unreadCount = 0;
-    if ("clearAppBadge" in navigator) {
-        navigator.clearAppBadge().catch(() => {});
+function agregarMensajeAlChat(data) {
+    const sender = data.username || `Usuario ${data.user_id}`;
+    const isSelf = sender === usernameGlobal;
+
+    const msg = document.createElement("div");
+    msg.dataset.id = data.id;
+    msg.classList.add(isSelf ? "user-self" : "user-other");
+
+    // Nombre en negrita
+    const usernameSpan = document.createElement("span");
+    usernameSpan.textContent = sender + ": ";
+    usernameSpan.style.fontWeight = "bold";
+    msg.appendChild(usernameSpan);
+
+    // Texto o audio
+    if (data.content) {
+        msg.appendChild(document.createTextNode(data.content));
+    } else if (data.audio_url) {
+        const audio = document.createElement("audio");
+        audio.controls = true;
+        audio.src = data.audio_url;
+        msg.appendChild(audio);
     }
+
+    messagesDiv.appendChild(msg);
 }
 
-function incrementarBadge() {
-    unreadCount++;
-    if ("setAppBadge" in navigator) {
-        navigator.setAppBadge(unreadCount).catch(() => {});
-    }
-}
 
 // =========================
-// LIMPIAR BADGE AL VER MENSAJES
-// =========================
-messagesDiv.addEventListener("click", () => {
-    resetBadge();
-});
-window.addEventListener("focus", () => {
-    resetBadge();
-});
-
-// =========================
-// CONECTAR WEBSOCKET CON RECONEXIÓN
+// CONECTAR WEBSOCKET
 // =========================
 function conectarSocket() {
     const token = localStorage.getItem("token");
@@ -197,66 +120,28 @@ function conectarSocket() {
     socket = new WebSocket(`wss://chat-familiar-backend-spp8.onrender.com/ws?token=${token}`);
 
     socket.onopen = () => {
-        console.log("WebSocket conectado");
         reconnectInterval = 1000;
     };
 
     socket.onmessage = (event) => {
         const data = JSON.parse(event.data);
-        const sender = data.username || `Usuario ${data.user_id}`;
-        const isSelf = sender === usernameGlobal;
 
-        // Crear el mensaje
-        const msg = document.createElement("div");
-        msg.dataset.id = data.id;
-        msg.classList.add(isSelf ? "user-self" : "user-other");
+        agregarMensajeAlChat(data);
 
-        if (data.content) {
-            const usernameSpan = document.createElement("span");
-            usernameSpan.textContent = sender + ": ";
-            usernameSpan.style.fontWeight = "bold";
-            msg.appendChild(usernameSpan);
-            msg.appendChild(document.createTextNode(data.content));
-        } else if (data.audio_url) {
-            const audio = document.createElement("audio");
-            audio.controls = true;
-            audio.src = data.audio_url;
-
-            const usernameSpan = document.createElement("span");
-            usernameSpan.textContent = sender + ": ";
-            usernameSpan.style.fontWeight = "bold";
-            msg.appendChild(usernameSpan);
-            msg.appendChild(audio);
-        }
-
-        messagesDiv.appendChild(msg);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
-        habilitarOpcionesMensajes();
-
-        // Notificación y badge si no es tuyo
-        if (!isSelf) {
-            incrementarBadge();
-            if (Notification.permission === "granted") {
-                new Notification(`Nuevo mensaje de ${sender}`, {
-                    body: data.content || "Audio",
-                    icon: "icons/icon-192.png"
-                });
-            }
-        }
     };
 
     socket.onclose = () => {
-        console.log("WebSocket cerrado. Intentando reconectar...");
         socket = null;
         setTimeout(conectarSocket, reconnectInterval);
         reconnectInterval = Math.min(reconnectInterval * 2, MAX_RECONNECT);
     };
 
-    socket.onerror = (err) => {
-        console.log("Error en WebSocket", err);
+    socket.onerror = () => {
         socket.close();
     };
 }
+
 
 // =========================
 // CARGAR MENSAJES INICIALES
@@ -269,41 +154,15 @@ async function cargarMensajesIniciales() {
     messagesDiv.innerHTML = "";
 
     messages.forEach(data => {
-        const sender = data.username || `Usuario ${data.user_id}`;
-        const isSelf = sender === usernameGlobal;
-
-        const msg = document.createElement("div");
-        msg.dataset.id = data.id;
-        msg.classList.add(isSelf ? "user-self" : "user-other");
-
-        if (data.content) {
-            const usernameSpan = document.createElement("span");
-            usernameSpan.textContent = sender + ": ";
-            usernameSpan.style.fontWeight = "bold";
-            msg.appendChild(usernameSpan);
-            msg.appendChild(document.createTextNode(data.content));
-        } else if (data.audio_url) {
-            const audio = document.createElement("audio");
-            audio.controls = true;
-            audio.src = data.audio_url;
-
-            const usernameSpan = document.createElement("span");
-            usernameSpan.textContent = sender + ": ";
-            usernameSpan.style.fontWeight = "bold";
-            msg.appendChild(usernameSpan);
-            msg.appendChild(audio);
-        }
-
-        messagesDiv.appendChild(msg);
+        agregarMensajeAlChat(data);
     });
 
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    habilitarOpcionesMensajes();
-    resetBadge(); // al cargar mensajes iniciales
 }
 
+
 // =========================
-// RESTAURAR SESIÓN AL CARGAR
+// RESTAURAR SESIÓN
 // =========================
 window.addEventListener("load", async () => {
     const token = localStorage.getItem("token");
@@ -322,22 +181,17 @@ window.addEventListener("load", async () => {
         await cargarMensajesIniciales();
         conectarSocket();
 
-    } catch (error) {
-        console.log("Token inválido");
+    } catch {
         cerrarSesion();
     }
 });
+
 
 // =========================
 // LOGIN
 // =========================
 loginBtn.addEventListener("click", async (e) => {
     e.preventDefault();
-
-    if (!navigator.onLine) {
-        alert("Sin conexión. Conectate a internet para iniciar sesión.");
-        return;
-    }
 
     const username = document.getElementById("username").value.trim();
     const password = document.getElementById("password").value.trim();
@@ -359,7 +213,7 @@ loginBtn.addEventListener("click", async (e) => {
         });
 
         const data = await response.json();
-        if (!response.ok) throw new Error(data.detail || "Error en login");
+        if (!response.ok) throw new Error(data.detail);
 
         localStorage.setItem("token", data.access_token);
         usernameGlobal = username;
@@ -371,18 +225,19 @@ loginBtn.addEventListener("click", async (e) => {
         conectarSocket();
 
     } catch (error) {
-        console.error("Error login:", error);
         alert(error.message);
     }
 });
 
+
 // =========================
 // LOGOUT
 // =========================
-logoutBtn.addEventListener("click", () => cerrarSesion());
+logoutBtn.addEventListener("click", cerrarSesion);
+
 
 // =========================
-// ENVIAR MENSAJE DE TEXTO
+// ENVIAR MENSAJE (SOLO BOTÓN)
 // =========================
 sendBtn.addEventListener("click", () => {
     const text = messageInput.value.trim();
@@ -397,6 +252,7 @@ sendBtn.addEventListener("click", () => {
     messageInput.value = "";
 });
 
+
 // =========================
 // GRABACIÓN DE AUDIO
 // =========================
@@ -407,6 +263,7 @@ recordBtn.addEventListener("click", async () => {
         audioChunks = [];
 
         mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+
         mediaRecorder.onstop = async () => {
             const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
             const formData = new FormData();
@@ -418,22 +275,20 @@ recordBtn.addEventListener("click", async () => {
                     body: formData
                 });
 
-                if (!response) throw new Error("Error subiendo audio");
-
                 const data = await response.json();
 
                 if (socket && socket.readyState === WebSocket.OPEN) {
                     socket.send(JSON.stringify({ content: null, audio_url: data.audio_filename }));
                 }
 
-            } catch (err) {
-                console.error("Error audio:", err);
+            } catch {
                 alert("No se pudo enviar el audio");
             }
         };
 
         mediaRecorder.start();
-        recordBtn.textContent = "⏹️";
+        recordBtn.textContent = "⭕";
+
     } else if (mediaRecorder.state === "recording") {
         mediaRecorder.stop();
         recordBtn.textContent = "🎤";

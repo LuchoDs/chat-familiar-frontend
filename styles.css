@@ -93,7 +93,9 @@ header h2 {
     font-size: 1.1rem;
 }
 
-/* MENSAJES */
+/* =========================
+   MENSAJES
+========================= */
 #messages {
     flex: 1;
     overflow-y: auto;
@@ -115,16 +117,22 @@ header h2 {
     font-size: 0.95rem;
 }
 
-/* Mensajes propios */
-#messages div.my-message {
+/* =========================
+   MENSAJES PROPIOS
+========================= */
+#messages div.user-self {
     background-color: #dcf8c6;
     align-self: flex-end;
+    border-bottom-right-radius: 4px; /* estilo tipo WhatsApp */
 }
 
-/* Mensajes de otros */
-#messages div.other-message {
-    background-color: #fff;
+/* =========================
+   MENSAJES DE OTROS
+========================= */
+#messages div.user-other {
+    background-color: #ffffff;
     align-self: flex-start;
+    border-bottom-left-radius: 4px; /* estilo tipo WhatsApp */
 }
 
 /* =========================
@@ -144,6 +152,7 @@ header h2 {
     border: 1px solid #ccc;
     outline: none;
     font-size: 16px;
+    resize: none;
 }
 
 button {
