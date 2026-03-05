@@ -90,7 +90,7 @@ header {
 }
 
 header h2 {
-    font-size: 1.1rem;
+    font-size: 1.4rem;
 }
 
 /* =========================
@@ -114,7 +114,8 @@ header h2 {
     word-wrap: break-word;
     background-color: white;
     box-shadow: 0 1px 1px rgba(0,0,0,0.1);
-    font-size: 0.95rem;
+    font-size: 1.1rem;
+    line-height: 1.2;
 }
 
 /* =========================
@@ -163,7 +164,7 @@ button {
     background-color: #00a7aa;
     color: white;
     transition: background 0.3s;
-    font-size: 14px;
+    font-size: 16px;
 }
 
 button:hover {
@@ -173,7 +174,21 @@ button:hover {
 #logout-btn {
     background-color: #e74c3c;
     padding: 6px 10px;
-    font-size: 0.8rem;
+    font-size: 1rem;
+}
+
+#send-btn {
+    font-size: 26x;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#record-btn {
+    font-size: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* =========================
