@@ -162,8 +162,8 @@ header h2 {
 ========================= */
 
 .delete-btn {
-    font-size: 0.8rem;
-    color: #e76759;
+    font-size: 1rem;
+    color: #e92711;
     cursor: pointer;
     padding: 6px 8px;
     user-select: none;
