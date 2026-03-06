@@ -41,7 +41,7 @@ self.addEventListener("activate", event => {
 // =========================
 self.addEventListener("fetch", event => {
   const url = new URL(event.request.url);
-  if (url.origin === location.origin && urlsToCache.includes(url.pathname)) {
+  if (url.origin === location.origin && urlsToCache.includes(`.${url.pathname}`)) {
     event.respondWith(
       caches.match(event.request).then(cached => cached || fetch(event.request))
     );
@@ -52,26 +52,22 @@ self.addEventListener("fetch", event => {
 // PUSH NOTIFICATIONS
 // =========================
 self.addEventListener("push", event => {
-  let data = { title: "Nuevo mensaje", body: "Tenés un mensaje nuevo", url: "/" };
+  let data = { title: "Nuevo mensaje", body: "Tenés un mensaje nuevo", url: "./index.html"};
   
   try {
-    if (event.data) {
-      data = event.data.json();
-    }
+    if (event.data) data = event.data.json();
   } catch (err) {
     console.error("Error parseando push", err);
   }
 
   const options = {
     body: data.body,
-    icon: "/icons/icon-192.png",
-    badge: "/icons/icon-192.png",
+    icon: "./icons/icon-192.png",
+    badge: "./icons/icon-192.png",
     data: { url: data.url } // Para abrir la app al click
   };
 
-  event.waitUntil(
-    self.registration.showNotification(data.title, options)
-  );
+  event.waitUntil(self.registration.showNotification(data.title, options));
 });
 
 // =========================
@@ -80,12 +76,12 @@ self.addEventListener("push", event => {
 self.addEventListener("notificationclick", event => {
   event.notification.close();
 
-  const url = event.notification.data.url || "/";
+  const url = event.notification.data.url || "./index.html";
 
   event.waitUntil(
     clients.matchAll({ type: "window" }).then(windowClients => {
       for (let client of windowClients) {
-        if (client.url === url && "focus" in client) return client.focus();
+        if (client.url.includes(url) && "focus" in client) return client.focus();
       }
       if (clients.openWindow) return clients.openWindow(url);
     })
