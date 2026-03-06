@@ -87,7 +87,7 @@ async function suscribirsePush() {
         const permission = await Notification.requestPermission();
         if (permission !== "granted") return;
 
-        const VAPID_PUBLIC_KEY = "TU_VAPID_PUBLIC_KEY_AQUI"; // reemplazar con la tuya
+        const VAPID_PUBLIC_KEY = `MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEIttR7ZHiK95Pk6wSJJNL8TzoYNGOzFE3sRTdLB0AsSbJwguQQMb0quuCLuZ+OM2asj98AZeA+UmejoM5Dcxlfw==`;
         const convertedVapidKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
 
         const subscription = await registration.pushManager.subscribe({
