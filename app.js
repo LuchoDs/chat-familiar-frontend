@@ -26,14 +26,12 @@ let longPressTimer = null;
 const LONG_PRESS_DURATION = 600;
 let activeRow = null;
 
-
 // =========================
 // ENTER = SOLO SALTO DE LÍNEA
 // =========================
 messageInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter") return;
 });
-
 
 // =========================
 // FETCH CON AUTENTICACIÓN
@@ -61,7 +59,6 @@ async function fetchConAuth(url, options = {}) {
     return response;
 }
 
-
 // =========================
 // CERRAR SESIÓN
 // =========================
@@ -78,24 +75,58 @@ function cerrarSesion() {
     chatView.classList.add("hidden");
 }
 
+// =========================
+// SUSCRIPCIÓN A PUSH
+// =========================
+async function suscribirsePush() {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+
+    try {
+        const registration = await navigator.serviceWorker.ready;
+
+        const permission = await Notification.requestPermission();
+        if (permission !== "granted") return;
+
+        const VAPID_PUBLIC_KEY = "TU_VAPID_PUBLIC_KEY_AQUI"; // reemplazar con la tuya
+        const convertedVapidKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+
+        const subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: convertedVapidKey
+        });
+
+        // Enviar suscripción al backend
+        await fetchConAuth(`${BASE_URL}/subscribe`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(subscription)
+        });
+
+    } catch (err) {
+        console.error("Error suscribiéndose a push:", err);
+    }
+}
+
+// Convierte VAPID public key
+function urlBase64ToUint8Array(base64String) {
+    const padding = "=".repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const rawData = window.atob(base64);
+    return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+}
 
 // =========================
 // ELIMINAR MENSAJE
 // =========================
 async function eliminarMensaje(id) {
     try {
-        await fetchConAuth(`${BASE_URL}/messages/${id}`, {
-            method: "DELETE"
-        });
-
+        await fetchConAuth(`${BASE_URL}/messages/${id}`, { method: "DELETE" });
         const msgRow = document.querySelector(`.message-row[data-id='${id}']`);
         if (msgRow) msgRow.remove();
-
     } catch {
         alert("No se pudo eliminar el mensaje");
     }
 }
-
 
 // =========================
 // MOSTRAR / OCULTAR DELETE
@@ -117,13 +148,11 @@ function ocultarDelete() {
     }
 }
 
-// Ocultar si se toca fuera
 document.addEventListener("touchstart", (e) => {
     if (activeRow && !activeRow.contains(e.target)) {
         ocultarDelete();
     }
 });
-
 
 // =========================
 // CREAR BURBUJA DE MENSAJE
@@ -140,9 +169,7 @@ function agregarMensajeAlChat(data) {
     deleteBtn.classList.add("delete-btn");
     deleteBtn.textContent = "Eliminar";
 
-    deleteBtn.addEventListener("click", () => {
-        eliminarMensaje(data.id);
-    });
+    deleteBtn.addEventListener("click", () => eliminarMensaje(data.id));
 
     const bubble = document.createElement("div");
     bubble.classList.add("bubble", isSelf ? "bubble-self" : "bubble-other");
@@ -170,42 +197,27 @@ function agregarMensajeAlChat(data) {
         row.appendChild(deleteBtn);
     }
 
-    // =========================
     // LONG PRESS (MOBILE)
-    // =========================
     row.addEventListener("touchstart", () => {
-        longPressTimer = setTimeout(() => {
-            mostrarDelete(row);
-        }, LONG_PRESS_DURATION);
+        longPressTimer = setTimeout(() => mostrarDelete(row), LONG_PRESS_DURATION);
     });
 
-    row.addEventListener("touchend", () => {
-        clearTimeout(longPressTimer);
-    });
-
-    row.addEventListener("touchmove", () => {
-        clearTimeout(longPressTimer);
-    });
+    row.addEventListener("touchend", () => clearTimeout(longPressTimer));
+    row.addEventListener("touchmove", () => clearTimeout(longPressTimer));
 
     messagesDiv.appendChild(row);
 }
-
 
 // =========================
 // CONECTAR WEBSOCKET
 // =========================
 function conectarSocket() {
     const token = localStorage.getItem("token");
-    if (!token) {
-        cerrarSesion();
-        return;
-    }
+    if (!token) { cerrarSesion(); return; }
 
-    socket = new WebSocket(`wss://chat-familiar-backend-spp8.onrender.com/ws?token=${token}`);
+    socket = new WebSocket(`${BASE_URL.replace(/^http/, "ws")}/ws?token=${token}`);
 
-    socket.onopen = () => {
-        reconnectInterval = 1000;
-    };
+    socket.onopen = () => reconnectInterval = 1000;
 
     socket.onmessage = (event) => {
         const data = JSON.parse(event.data);
@@ -219,11 +231,8 @@ function conectarSocket() {
         reconnectInterval = Math.min(reconnectInterval * 2, MAX_RECONNECT);
     };
 
-    socket.onerror = () => {
-        socket.close();
-    };
+    socket.onerror = () => socket.close();
 }
-
 
 // =========================
 // CARGAR MENSAJES INICIALES
@@ -234,17 +243,12 @@ async function cargarMensajesIniciales() {
 
     const messages = await response.json();
     messagesDiv.innerHTML = "";
-
-    messages.forEach(data => {
-        agregarMensajeAlChat(data);
-    });
-
+    messages.forEach(data => agregarMensajeAlChat(data));
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
-
 // =========================
-// RESTAURAR SESIÓN
+// RESTAURAR SESIÓN AL CARGAR
 // =========================
 window.addEventListener("load", async () => {
     const token = localStorage.getItem("token");
@@ -262,12 +266,11 @@ window.addEventListener("load", async () => {
 
         await cargarMensajesIniciales();
         conectarSocket();
-
+        suscribirsePush(); // 🔹 SUSCRIPCIÓN PUSH
     } catch {
         cerrarSesion();
     }
 });
-
 
 // =========================
 // LOGIN
@@ -278,10 +281,7 @@ loginBtn.addEventListener("click", async (e) => {
     const username = document.getElementById("username").value.trim();
     const password = document.getElementById("password").value.trim();
 
-    if (!username || !password) {
-        alert("Completar usuario y contraseña");
-        return;
-    }
+    if (!username || !password) { alert("Completar usuario y contraseña"); return; }
 
     const formData = new URLSearchParams();
     formData.append("username", username);
@@ -305,18 +305,16 @@ loginBtn.addEventListener("click", async (e) => {
 
         await cargarMensajesIniciales();
         conectarSocket();
-
+        suscribirsePush(); // 🔹 SUSCRIPCIÓN PUSH
     } catch (error) {
         alert(error.message);
     }
 });
 
-
 // =========================
 // LOGOUT
 // =========================
 logoutBtn.addEventListener("click", cerrarSesion);
-
 
 // =========================
 // ENVIAR MENSAJE
@@ -333,7 +331,6 @@ sendBtn.addEventListener("click", () => {
     socket.send(JSON.stringify({ content: text, audio_url: null }));
     messageInput.value = "";
 });
-
 
 // =========================
 // GRABACIÓN DE AUDIO

@@ -35,12 +35,31 @@
     </div>
 
     <script src="app.js"></script>
+
+    <!-- =========================
+         SERVICE WORKER & PUSH
+    ========================= -->
     <script>
+        // Registrar Service Worker
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js')
-                .then(reg => console.log('Service Worker registrado', reg))
-                .catch(err => console.log('Error registrando SW', err));
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => {
+                        console.log('Service Worker registrado', reg);
+                    })
+                    .catch(err => {
+                        console.error('Error registrando SW', err);
+                    });
+            });
+        }
+
+        // Pedir permiso de notificaciones al cargar
+        if ('Notification' in window) {
+            Notification.requestPermission().then(permission => {
+                console.log('Permiso de notificaciones:', permission);
+            });
         }
     </script>
+
 </body>
 </html>
