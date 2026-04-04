@@ -82,7 +82,7 @@ header {
 }
 
 #logout-btn {
-    background: white;        /* Fondo blanco para que resalte */
+    background: none;        /* Fondo blanco para que resalte */
     border: none;
     border-radius: 10px;      /* Bordes redondeados, no tan circular */
     width: 45px;              /* Más ancho */
