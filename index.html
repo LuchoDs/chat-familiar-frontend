@@ -10,12 +10,16 @@
 </head>
 <body>
 
-    <!-- LOGIN VIEW -->
+<!-- LOGIN VIEW -->
     <div id="login-view" class="view">
         <h2>Login</h2>
-        <input type="text" id="username" placeholder="Usuario">
-        <input type="password" id="password" placeholder="Password">
-        <button id="login-btn">Ingresar</button>
+        <!-- Agregamos el form con autocomplete off -->
+        <form id="login-form" autocomplete="off">
+            <input type="text" id="username" placeholder="Usuario" autocomplete="off">
+            <!-- Usamos new-password para que Chrome no intente sugerir la clave guardada -->
+            <input type="password" id="password" placeholder="Password" autocomplete="new-password">
+            <button type="submit" id="login-btn">Ingresar</button>
+        </form>
     </div>
 
     <!-- CHAT VIEW -->

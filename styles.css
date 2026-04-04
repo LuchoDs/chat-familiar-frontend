@@ -1,50 +1,148 @@
 /*Styles.css*/
 
+/* --- RESET Y BASE --- */
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: sans-serif; background: #e5ddd5; min-height: 100vh; display: flex; flex-direction: column; }
+
+body { 
+    font-family: sans-serif; 
+    background: #e5ddd5; 
+    height: 100vh; /* Altura total fija */
+    display: flex; 
+    flex-direction: column; 
+    overflow: hidden; /* Evita que el cuerpo haga scroll */
+}
+
 .hidden { display: none !important; }
 
-#login-view { background: white; padding: 40px; margin-top: 10vh; text-align: center; }
-#login-view input { padding: 12px; width: 100%; margin: 8px 0; border: 1px solid #ccc; }
+/* --- LOGIN VIEW (Centrado Total) --- */
+#login-view { 
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* Centra vertical */
+    align-items: center;     /* Centra horizontal */
+    height: 100vh;           /* Usa toda la pantalla */
+    padding: 20px;
+}
 
-#chat-view { display: flex; flex-direction: column; height: 100vh; background: #fff; }
-header { padding: 15px; background: #00a7aa; color: white; display: flex; justify-content: space-between; }
+#login-form {
+    background: white;
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    width: 100%;
+    max-width: 320px;
+    text-align: center;
+}
 
-#messages { flex: 1; overflow-y: auto; background: #efe7dd; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
+#login-view h2 { margin-bottom: 20px; color: #333; }
 
+#login-view input { 
+    padding: 12px; 
+    width: 100%; 
+    margin: 8px 0; 
+    border: 1px solid #ccc; 
+    border-radius: 8px;
+    font-size: 16px; /* Evita zoom en móviles */
+}
+
+/* Botón Ingresar Diferenciado */
+#login-btn { 
+    width: 100%;
+    margin-top: 15px;
+    padding: 12px; 
+    border: none; 
+    cursor: pointer; 
+    background: #00a7aa; /* Color de la app */
+    color: white;
+    border-radius: 8px; 
+    font-weight: bold;
+    font-size: 16px;
+}
+
+/* --- CHAT VIEW (Estructura Fija) --- */
+#chat-view { 
+    display: flex; 
+    flex-direction: column; 
+    height: 100vh; /* Altura total de pantalla */
+    background: #efe7dd; 
+}
+
+header { 
+    padding: 15px; 
+    background: #00a7aa; 
+    color: white; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center;
+    flex-shrink: 0; /* No permite que el header se achique */
+    z-index: 10;
+}
+
+/* SECCIÓN MENSAJES (Única con scroll) */
+#messages { 
+    flex: 1; /* Ocupa todo el espacio disponible */
+    overflow-y: auto; /* Solo esta parte hace scroll */
+    padding: 15px; 
+    display: flex; 
+    flex-direction: column; 
+    gap: 10px; 
+    -webkit-overflow-scrolling: touch; /* Scroll suave en iOS */
+}
+
+/* --- BURBUJAS --- */
 .message-bubble {
     position: relative;
     padding: 10px 14px;
     border-radius: 12px;
-    max-width: 80%;
+    max-width: 85%;
     word-wrap: break-word;
     background: white;
     box-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
 
-.message-other { align-self: flex-start; border: 1px solid #ddd; }
-.message-mine { align-self: flex-end; background-color: #c5f1a3; }
+.message-other { align-self: flex-start; border-bottom-left-radius: 2px; }
+.message-mine { align-self: flex-end; background-color: #dcf8c6; border-bottom-right-radius: 2px; }
 
-.username { font-weight: bold; font-size: 1.1rem; color: #fa0606ad; display: block; margin-bottom: 4px; }
+.username { font-weight: bold; font-size: 0.9rem; color: #fa0606ad; display: block; margin-bottom: 4px; }
 
-.btn-delete {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #ff4d4d;
-    background: white;
-    border: none;
-    padding: 5px 10px;
-    border-radius: 5px;
-    font-size: 12px;
-    font-weight: bold;
-    cursor: pointer;
-    z-index: 10;
+/* --- ÁREA DE INPUT (Fija abajo) --- */
+.input-area { 
+    display: flex; 
+    padding: 10px; 
+    background: #f0f0f0; /* Fondo gris claro para que resalte el input */
+    gap: 8px; 
+    align-items: center;
+    flex-shrink: 0; /* No permite que se achique */
 }
 
-.message-mine .btn-delete { left: -90px; }
-.message-other .btn-delete { right: -90px; }
+#message-input { 
+    flex: 1; 
+    padding: 12px; 
+    border-radius: 25px; 
+    border: 1px solid #ddd; 
+    outline: none;
+    font-size: 16px;
+}
 
-.input-area { display: flex; padding: 10px; background: #00a7aa; gap: 8px; }
-#message-input { flex: 1; padding: 12px; border-radius: 20px; border: none; }
-button { padding: 10px; border: none; cursor: pointer; background: white; border-radius: 6px; }
+/* Botones circulares de enviar/grabar */
+.input-area button { 
+    padding: 10px; 
+    border: none; 
+    cursor: pointer; 
+    background: #00a7aa; 
+    color: white;
+    border-radius: 50%; /* Redondos */
+    width: 45px;
+    height: 45px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Botón de Logout pequeño en header */
+#logout-btn {
+    background: rgba(255,255,255,0.2);
+    color: white;
+    padding: 5px 10px;
+    font-size: 12px;
+}

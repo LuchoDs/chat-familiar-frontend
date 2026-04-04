@@ -60,18 +60,32 @@ async function inicializarApp() {
     }
 }
 
-// Evento de Carga Inicial
-window.addEventListener("load", async () => {
+// --- EVENTO DE CARGA INICIAL (VERSIÓN DEFINITIVA) ---
+window.addEventListener("load", () => {
     const token = localStorage.getItem("token");
     const savedUser = localStorage.getItem("chat_user");
     const savedPass = localStorage.getItem("chat_pass");
 
     if (token) {
-        // Si hay token, intentamos entrar directo
-        await inicializarApp();
+        // Si ya hay token (sesión activa), entramos de una
+        inicializarApp();
     } else if (savedUser && savedPass) {
-        // Si no hay token pero hay credenciales, autologin
-        await intentarLogin(savedUser, savedPass);
+        // Si no hay token pero hay credenciales guardadas:
+        // Esperamos 500ms para que el Moto E22 termine de renderizar los inputs
+        setTimeout(async () => {
+            const uInput = document.getElementById("username");
+            const pInput = document.getElementById("password");
+
+            if (uInput && pInput) {
+                // Llenamos los campos visualmente (esto calma a Chrome)
+                uInput.value = savedUser;
+                pInput.value = savedPass;
+                
+                console.log("Autologin: Intentando entrar con datos guardados...");
+                // Ejecutamos el login automáticamente sin tocar nada
+                await intentarLogin(savedUser, savedPass);
+            }
+        }, 500); 
     }
 });
 
