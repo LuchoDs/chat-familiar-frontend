@@ -38,41 +38,49 @@ self.addEventListener("activate", event => {
 self.addEventListener("fetch", event => {
   const url = new URL(event.request.url);
 
-  // Solo manejar requests al mismo origen (tu frontend)
+  // Si es un archivo que tenemos en cache
   if (url.origin === location.origin && urlsToCache.includes(url.pathname)) {
     event.respondWith(
-      caches.match(event.request).then(cached => cached || fetch(event.request))
+      // Estrategia: "Network First" (Intentar red, si falla usar cache)
+      // Así nos aseguramos de que si hay cambios en el CSS o JS, el celu los baje
+      fetch(event.request)
+        .then(response => {
+          // Si la red responde bien, actualizamos el cache y devolvemos la respuesta
+          const resClone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, resClone));
+          return response;
+        })
+        .catch(() => caches.match(event.request)) // Si no hay internet, usamos el cache
     );
   }
 });
-
 // Escuchar las notificaciones Push
 self.addEventListener('push', function(event) {
-    let data = { title: 'Nuevo mensaje', body: 'Tienes un mensaje nuevo en el chat' };
-    
-    if (event.data) {
-        data = event.data.json();
-    }
+    // Definimos el texto genérico que se verá SIEMPRE
+    const tituloFijo = 'Chat Familiar';
+    const cuerpoFijo = 'Tienes nuevos mnesajes..🐕🐩';
 
     const options = {
-        body: data.body,
-        icon: '/icons/icon-192.png', // Usa tus iconos configurados
-        badge: '/icons/icon-192.png',
+        body: cuerpoFijo,
+        icon: '/icons/icon-192.png',
+        badge: '/icons/icon-192.png', // Icono chiquito para la barra de estado
         vibrate: [100, 50, 100],
+        tag: 'chat-fam-pila',        // CLAVE: Mantiene una sola notificación activa
+        renotify: true,              // CLAVE: Vibra con cada mensaje nuevo que entra
         data: {
-            url: self.location.origin // URL a donde irá al hacer clic
+            url: self.location.origin // Al tocar, abre la web
         }
     };
 
     event.waitUntil(
-        self.registration.showNotification(data.title, options)
+        self.registration.showNotification(tituloFijo, options)
     );
 });
 
-// Opcional: Acción al hacer clic en la notificación
+// Manejar el clic en la notificación
 self.addEventListener('notificationclick', function(event) {
-    event.notification.close();
+    event.notification.close(); // Cerramos la notificación al tocarla
     event.waitUntil(
-        clients.openWindow(event.notification.data.url)
+        clients.openWindow(event.notification.data.url) // Abrimos la App
     );
 });

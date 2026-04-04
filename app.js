@@ -8,7 +8,9 @@ let mediaRecorder = null;
 let audioChunks = [];
 
 const BASE_URL = "https://chat-familiar-backend-spp8.onrender.com";
+const VAPID_PUBLIC_KEY = 'BEulalZLNf2nIjCYiJTZMlbsn_59u6Hs0BrFBwm_uN_KlU5V-dzV9vUniqxr-r1Q0wlJq-CZEF3dFJ0uN3L-H4M';
 
+// Elementos del DOM
 const loginBtn = document.getElementById("login-btn");
 const logoutBtn = document.getElementById("logout-btn");
 const sendBtn = document.getElementById("send-btn");
@@ -17,7 +19,63 @@ const messageInput = document.getElementById("message-input");
 const messagesDiv = document.getElementById("messages");
 const loginView = document.getElementById("login-view");
 const chatView = document.getElementById("chat-view");
-const VAPID_PUBLIC_KEY = 'BEulalZLNf2nIjCYiJTZMlbsn_59u6Hs0BrFBwm_uN_KlU5V-dzV9vUniqxr-r1Q0wlJq-CZEF3dFJ0uN3L-H4M'
+
+// --- 1. PERSISTENCIA Y AUTOLOGIN ---
+
+async function intentarLogin(user, pass) {
+    const fd = new URLSearchParams();
+    fd.append("username", user);
+    fd.append("password", pass);
+
+    try {
+        const res = await fetch(`${BASE_URL}/login`, { method: "POST", body: fd });
+        if (res.ok) {
+            const data = await res.json();
+            localStorage.setItem("token", data.access_token);
+            // Guardamos credenciales para futuros autologins
+            localStorage.setItem("chat_user", user);
+            localStorage.setItem("chat_pass", pass);
+            
+            await inicializarApp();
+        } else {
+            cerrarSesion();
+        }
+    } catch (err) {
+        console.error("Error en autologin:", err);
+    }
+}
+
+async function inicializarApp() {
+    const res = await fetchConAuth(`${BASE_URL}/me`);
+    if (res?.ok) {
+        const user = await res.json();
+        usernameGlobal = user.username;
+        loginView.classList.add("hidden");
+        chatView.classList.remove("hidden");
+        cargarMensajesIniciales();
+        conectarSocket();
+        inicializarNotificaciones();
+    } else {
+        cerrarSesion();
+    }
+}
+
+// Evento de Carga Inicial
+window.addEventListener("load", async () => {
+    const token = localStorage.getItem("token");
+    const savedUser = localStorage.getItem("chat_user");
+    const savedPass = localStorage.getItem("chat_pass");
+
+    if (token) {
+        // Si hay token, intentamos entrar directo
+        await inicializarApp();
+    } else if (savedUser && savedPass) {
+        // Si no hay token pero hay credenciales, autologin
+        await intentarLogin(savedUser, savedPass);
+    }
+});
+
+// --- 2. FUNCIONES DE COMUNICACIÓN ---
 
 async function fetchConAuth(url, options = {}) {
     const token = localStorage.getItem("token");
@@ -30,17 +88,45 @@ async function fetchConAuth(url, options = {}) {
 
 function cerrarSesion() {
     localStorage.removeItem("token");
+    localStorage.removeItem("chat_user");
+    localStorage.removeItem("chat_pass");
     if (socket) socket.close();
     location.reload();
 }
+
+function conectarSocket() {
+    const token = localStorage.getItem("token");
+    socket = new WebSocket(`wss://chat-familiar-backend-spp8.onrender.com/ws?token=${token}`);
+    
+    socket.onopen = () => {
+        console.log("Conectado");
+        reconnectInterval = 1000;
+    };
+
+    socket.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        messagesDiv.appendChild(renderizarMensaje(data));
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+        if (document.visibilityState !== 'visible' && 'setAppBadge' in navigator) {
+            navigator.setAppBadge().catch(console.error);
+        }
+    };
+
+    socket.onclose = () => {
+        setTimeout(conectarSocket, reconnectInterval);
+        reconnectInterval = Math.min(reconnectInterval * 2, MAX_RECONNECT);
+    };
+}
+
+// --- 3. MENSAJES Y UI ---
 
 function renderizarMensaje(data) {
     const msg = document.createElement("div");
     msg.dataset.id = data.id;
     const esMio = (data.username === usernameGlobal);
     
-    msg.classList.add("message-bubble");
-    msg.classList.add(esMio ? "message-mine" : "message-other");
+    msg.classList.add("message-bubble", esMio ? "message-mine" : "message-other");
 
     const nombre = document.createElement("span");
     nombre.className = "username";
@@ -58,6 +144,7 @@ function renderizarMensaje(data) {
     }
     msg.appendChild(contenido);
 
+    // Eliminar con toque largo
     let pressTimer;
     msg.addEventListener("touchstart", () => pressTimer = setTimeout(() => mostrarBtnEliminar(msg), 600));
     msg.addEventListener("touchend", () => clearTimeout(pressTimer));
@@ -88,120 +175,13 @@ async function cargarMensajesIniciales() {
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
-function conectarSocket() {
-    const token = localStorage.getItem("token");
-    // Usamos wss para conexión segura
-    socket = new WebSocket(`wss://chat-familiar-backend-spp8.onrender.com/ws?token=${token}`);
-    
-    socket.onopen = () => {
-        console.log("Conectado al servidor de chat");
-        reconnectInterval = 1000; // Resetear intervalo al conectar
-    };
-
-    socket.onmessage = (e) => {
-        const data = JSON.parse(e.data);
-        messagesDiv.appendChild(renderizarMensaje(data));
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
-
-        // --- BADGE LOGIC ---
-        // Si el chat no está visible, intentamos poner el globito en el icono
-        if (document.visibilityState !== 'visible' && 'setAppBadge' in navigator) {
-            navigator.setAppBadge().catch(console.error);
-        }
-    };
-
-    socket.onclose = () => {
-        console.log("Conexión perdida. Reintentando...");
-        setTimeout(conectarSocket, reconnectInterval);
-        reconnectInterval = Math.min(reconnectInterval * 2, MAX_RECONNECT);
-    };
-
-    socket.onerror = (err) => {
-        console.error("Error en WebSocket:", err);
-        socket.close();
-    };
-}
-
-// Limpiar el badge (globito) cuando el usuario abre la app
-window.addEventListener('focus', () => {
-    if ('clearAppBadge' in navigator) {
-        navigator.clearAppBadge().catch(console.error);
-    }
-});
-
-function urlBase64ToUint8Array(base64String) {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) {
-        outputArray[i] = rawData.charCodeAt(i);
-    }
-    return outputArray;
-}
-
-async function inicializarNotificaciones() {
-    if (!('serviceWorker' in navigator)) return;
-
-    try {
-        // 1. Pedir permiso
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-            console.warn("Permiso de notificación denegado");
-            return;
-        }
-
-        // 2. Esperar a que el SW esté listo
-        const registration = await navigator.serviceWorker.ready;
-
-        // 3. Suscribirse a Push
-        const subscription = await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey : urlBase64ToUint8Array(VAPID_PUBLIC_KEY), 
-        });
-
-        // 4. Enviar al backend (IMPORTANTE: .toJSON() para que el server reciba el formato correcto)
-        await fetchConAuth(`${BASE_URL}/subscribe`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(subscription.toJSON())
-        });
-        console.log("Suscripción Push exitosa");
-
-    } catch (err) {
-        console.error("Error en el sistema de notificaciones:", err);
-    }
-}
-
-window.addEventListener("load", async () => {
-    const token = localStorage.getItem("token");
-    if (token) {
-        const res = await fetchConAuth(`${BASE_URL}/me`);
-        if (res?.ok) {
-            const user = await res.json();
-            usernameGlobal = user.username;
-            loginView.classList.add("hidden");
-            chatView.classList.remove("hidden");
-            cargarMensajesIniciales();
-            conectarSocket();
-            inicializarNotificaciones();
-        } else {
-            cerrarSesion();
-        }
-    }
-});
+// --- 4. EVENTOS DE INTERFAZ ---
 
 loginBtn.addEventListener("click", async (e) => {
     e.preventDefault();
-    const fd = new URLSearchParams();
-    fd.append("username", document.getElementById("username").value);
-    fd.append("password", document.getElementById("password").value);
-    const res = await fetch(`${BASE_URL}/login`, { method: "POST", body: fd });
-    if (res.ok) {
-        const data = await res.json();
-        localStorage.setItem("token", data.access_token);
-        location.reload();
-    } else { alert("Usuario o contraseña incorrectos"); }
+    const u = document.getElementById("username").value;
+    const p = document.getElementById("password").value;
+    await intentarLogin(u, p);
 });
 
 logoutBtn.addEventListener("click", () => cerrarSesion());
@@ -234,10 +214,49 @@ recordBtn.addEventListener("click", async () => {
             mediaRecorder.start();
             recordBtn.textContent = "⭕";
         } catch (err) {
-            alert("No se pudo acceder al micrófono");
+            alert("Micrófono bloqueado. Revisá los permisos.");
         }
     } else { 
         mediaRecorder.stop(); 
         recordBtn.textContent = "🎤"; 
     }
+});
+
+// --- 5. NOTIFICACIONES PUSH ---
+
+async function inicializarNotificaciones() {
+    if (!('serviceWorker' in navigator)) return;
+    try {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') return;
+
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey : urlBase64ToUint8Array(VAPID_PUBLIC_KEY), 
+        });
+
+        await fetchConAuth(`${BASE_URL}/subscribe`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(subscription.toJSON())
+        });
+    } catch (err) {
+        console.error("Error Push:", err);
+    }
+}
+
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+}
+
+window.addEventListener('focus', () => {
+    if ('clearAppBadge' in navigator) navigator.clearAppBadge().catch(console.error);
 });
