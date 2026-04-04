@@ -30,6 +30,7 @@ async function fetchConAuth(url, options = {}) {
 
 function cerrarSesion() {
     localStorage.removeItem("token");
+    if (socket) socket.close();
     location.reload();
 }
 
@@ -89,15 +90,45 @@ async function cargarMensajesIniciales() {
 
 function conectarSocket() {
     const token = localStorage.getItem("token");
+    // Usamos wss para conexión segura
     socket = new WebSocket(`wss://chat-familiar-backend-spp8.onrender.com/ws?token=${token}`);
-    socket.onmessage = (e) => {
-        messagesDiv.appendChild(renderizarMensaje(JSON.parse(e.data)));
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    
+    socket.onopen = () => {
+        console.log("Conectado al servidor de chat");
+        reconnectInterval = 1000; // Resetear intervalo al conectar
     };
-    socket.onclose = () => setTimeout(conectarSocket, reconnectInterval);
+
+    socket.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        messagesDiv.appendChild(renderizarMensaje(data));
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+        // --- BADGE LOGIC ---
+        // Si el chat no está visible, intentamos poner el globito en el icono
+        if (document.visibilityState !== 'visible' && 'setAppBadge' in navigator) {
+            navigator.setAppBadge().catch(console.error);
+        }
+    };
+
+    socket.onclose = () => {
+        console.log("Conexión perdida. Reintentando...");
+        setTimeout(conectarSocket, reconnectInterval);
+        reconnectInterval = Math.min(reconnectInterval * 2, MAX_RECONNECT);
+    };
+
+    socket.onerror = (err) => {
+        console.error("Error en WebSocket:", err);
+        socket.close();
+    };
 }
 
-// Agrega esta función arriba de 'inicializarNotificaciones': CONVERTIR PEM EN 8Array
+// Limpiar el badge (globito) cuando el usuario abre la app
+window.addEventListener('focus', () => {
+    if ('clearAppBadge' in navigator) {
+        navigator.clearAppBadge().catch(console.error);
+    }
+});
+
 function urlBase64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
     const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -109,36 +140,36 @@ function urlBase64ToUint8Array(base64String) {
     return outputArray;
 }
 
-// Llamar a esta función después de un inicio de sesión exitoso
 async function inicializarNotificaciones() {
     if (!('serviceWorker' in navigator)) return;
 
-    // 1. Pedir permiso al usuario
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-        console.log("El usuario rechazó las notificaciones");
-        return;
-    }
-
-    // 2. Registrar el Service Worker
-    const registration = await navigator.serviceWorker.ready;
-
-    // 3. Suscribirse a Push
     try {
+        // 1. Pedir permiso
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+            console.warn("Permiso de notificación denegado");
+            return;
+        }
+
+        // 2. Esperar a que el SW esté listo
+        const registration = await navigator.serviceWorker.ready;
+
+        // 3. Suscribirse a Push
         const subscription = await registration.pushManager.subscribe({
             userVisibleOnly: true,
             applicationServerKey : urlBase64ToUint8Array(VAPID_PUBLIC_KEY), 
         });
 
-        // 4. Enviar la suscripción a tu backend
+        // 4. Enviar al backend (IMPORTANTE: .toJSON() para que el server reciba el formato correcto)
         await fetchConAuth(`${BASE_URL}/subscribe`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(subscription)
+            body: JSON.stringify(subscription.toJSON())
         });
-        console.log("Suscrito a notificaciones exitosamente");
+        console.log("Suscripción Push exitosa");
+
     } catch (err) {
-        console.error("Error en la suscripción Push:", err);
+        console.error("Error en el sistema de notificaciones:", err);
     }
 }
 
@@ -153,9 +184,9 @@ window.addEventListener("load", async () => {
             chatView.classList.remove("hidden");
             cargarMensajesIniciales();
             conectarSocket();
-
-            // --- AGREGA ESTA LÍNEA ---
             inicializarNotificaciones();
+        } else {
+            cerrarSesion();
         }
     }
 });
@@ -170,7 +201,7 @@ loginBtn.addEventListener("click", async (e) => {
         const data = await res.json();
         localStorage.setItem("token", data.access_token);
         location.reload();
-    } else { alert("Login incorrecto"); }
+    } else { alert("Usuario o contraseña incorrectos"); }
 });
 
 logoutBtn.addEventListener("click", () => cerrarSesion());
@@ -185,19 +216,28 @@ sendBtn.addEventListener("click", () => {
 
 recordBtn.addEventListener("click", async () => {
     if (!mediaRecorder || mediaRecorder.state === "inactive") {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        audioChunks = [];
-        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-        mediaRecorder.onstop = async () => {
-            const blob = new Blob(audioChunks, { type: "audio/webm" });
-            const fd = new FormData();
-            fd.append("file", blob, "audio.webm");
-            const res = await fetchConAuth(`${BASE_URL}/upload-audio`, { method: "POST", body: fd });
-            const data = await res.json();
-            socket.send(JSON.stringify({ content: null, audio_url: data.audio_filename }));
-        };
-        mediaRecorder.start();
-        recordBtn.textContent = "⭕";
-    } else { mediaRecorder.stop(); recordBtn.textContent = "🎤"; }
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+            mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+            mediaRecorder.onstop = async () => {
+                const blob = new Blob(audioChunks, { type: "audio/webm" });
+                const fd = new FormData();
+                fd.append("file", blob, "audio.webm");
+                const res = await fetchConAuth(`${BASE_URL}/upload-audio`, { method: "POST", body: fd });
+                if (res.ok) {
+                    const data = await res.json();
+                    socket.send(JSON.stringify({ content: null, audio_url: data.audio_filename }));
+                }
+            };
+            mediaRecorder.start();
+            recordBtn.textContent = "⭕";
+        } catch (err) {
+            alert("No se pudo acceder al micrófono");
+        }
+    } else { 
+        mediaRecorder.stop(); 
+        recordBtn.textContent = "🎤"; 
+    }
 });
