@@ -32,6 +32,9 @@ body {
     width: 100%;
     max-width: 320px;
     text-align: center;
+    
+    /* EL TRUCO: */
+    margin-bottom: 15vh; /* Esto lo sube un 15% de la pantalla respecto al centro */
 }
 
 #login-view h2 { margin-bottom: 20px; color: #333; }
