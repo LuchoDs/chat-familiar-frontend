@@ -81,6 +81,26 @@ header {
     z-index: 10;
 }
 
+#logout-btn {
+    background: white;        /* Fondo blanco para que resalte */
+    border: none;
+    border-radius: 10px;      /* Bordes redondeados, no tan circular */
+    width: 45px;              /* Más ancho */
+    height: 45px;             /* Más alto */
+    font-size: 24px;          /* Tamaño del emoji/icono más grande */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2); /* Sombra para que parezca un botón real */
+    transition: transform 0.1s;
+}
+
+#logout-btn:active {
+    transform: scale(0.9);    /* Efecto de hundido al tocarlo */
+    background: #f0f0f0;
+}
+
 /* SECCIÓN MENSAJES (Única con scroll) */
 #messages { 
     flex: 1; /* Ocupa todo el espacio disponible */
