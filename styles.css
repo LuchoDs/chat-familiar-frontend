@@ -109,40 +109,47 @@ header {
 .input-area { 
     display: flex; 
     padding: 10px; 
-    background: #f0f0f0; /* Fondo gris claro para que resalte el input */
+    background: #00a7aa; /* Mantenemos el verde de la app en la barra */
     gap: 8px; 
     align-items: center;
-    flex-shrink: 0; /* No permite que se achique */
+    flex-shrink: 0; 
 }
 
 #message-input { 
     flex: 1; 
     padding: 12px; 
     border-radius: 25px; 
-    border: 1px solid #ddd; 
+    border: none; 
     outline: none;
     font-size: 16px;
+    background: white;
 }
 
-/* Botones circulares de enviar/grabar */
+/* Estilo para los botones Enviar y Grabar */
 .input-area button { 
-    padding: 10px; 
-    border: none; 
-    cursor: pointer; 
-    background: #00a7aa; 
-    color: white;
-    border-radius: 50%; /* Redondos */
     width: 45px;
     height: 45px;
+    border-radius: 50%; /* Circulares */
+    border: none;
+    cursor: pointer;
+    background: white;  /* Fondo blanco como pediste */
+    color: black;       /* Flecha/Icono negro */
     display: flex;
     justify-content: center;
     align-items: center;
+    font-size: 18px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2); /* Un poquito de sombra para que resalten */
 }
 
-/* Botón de Logout pequeño en header */
-#logout-btn {
-    background: rgba(255,255,255,0.2);
-    color: white;
-    padding: 5px 10px;
-    font-size: 14px;
+/* Si querés que el Mic siga siendo igual (por ejemplo, con el color verde o emoji) 
+   podés dejarlo así o ajustarlo específicamente: */
+#record-btn {
+    /* Si querés que el Mic sea distinto al de enviar, ajustalo acá */
+    font-size: 20px; 
+}
+
+/* Efecto al tocar los botones */
+.input-area button:active {
+    background: #e0e0e0;
+    transform: scale(0.95);
 }
