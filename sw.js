@@ -58,7 +58,7 @@ self.addEventListener("fetch", event => {
 self.addEventListener('push', function(event) {
     // Definimos el texto genérico que se verá SIEMPRE
     const tituloFijo = 'Chat Familiar';
-    const cuerpoFijo = 'Tienes nuevos mnesajes..🐕🐩';
+    const cuerpoFijo = 'Tienes nuevos mensajes 🐕🐩';
 
     const options = {
         body: cuerpoFijo,
