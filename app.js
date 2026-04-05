@@ -31,8 +31,15 @@ async function intentarLogin(user, pass) {
         const res = await fetch(`${BASE_URL}/login`, { method: "POST", body: fd });
         if (res.ok) {
             const data = await res.json();
+            
+            // 1. Guardamos el token
             localStorage.setItem("token", data.access_token);
-            // Guardamos credenciales para futuros autologins
+            
+            // 2. NUEVO: Borramos la marca de "salida manual" 
+            // porque acabamos de entrar con éxito.
+            localStorage.removeItem("manual_logout"); 
+
+            // 3. Guardamos credenciales para futuros autologins
             localStorage.setItem("chat_user", user);
             localStorage.setItem("chat_pass", pass);
             
@@ -60,30 +67,36 @@ async function inicializarApp() {
     }
 }
 
-// --- EVENTO DE CARGA INICIAL (VERSIÓN DEFINITIVA) ---
+// --- EVENTO DE CARGA INICIAL (VERSIÓN CORREGIDA PARA LUCHO) ---
 window.addEventListener("load", () => {
     const token = localStorage.getItem("token");
     const savedUser = localStorage.getItem("chat_user");
     const savedPass = localStorage.getItem("chat_pass");
+    const manualLogout = localStorage.getItem("manual_logout"); // Buscamos si saliste con la casita
 
     if (token) {
-        // Si ya hay token (sesión activa), entramos de una
+        // Sesión activa: Entra directo al chat
         inicializarApp();
     } else if (savedUser && savedPass) {
-        // Si no hay token pero hay credenciales guardadas:
-        // Esperamos 500ms para que el Moto E22 termine de renderizar los inputs
+        // No hay token, pero tenemos los datos guardados
         setTimeout(async () => {
             const uInput = document.getElementById("username");
             const pInput = document.getElementById("password");
 
             if (uInput && pInput) {
-                // Llenamos los campos visualmente (esto calma a Chrome)
+                // 1. COMPLETAMOS LOS DATOS (Punto 1-a, 1-b y 2 de tu lista)
                 uInput.value = savedUser;
                 pInput.value = savedPass;
                 
-                console.log("Autologin: Intentando entrar con datos guardados...");
-                // Ejecutamos el login automáticamente sin tocar nada
-                await intentarLogin(savedUser, savedPass);
+                // 2. ¿ENTRAMOS SOLO O NO?
+                if (manualLogout === "true") {
+                    // Si usaste la casita, nos quedamos acá con los datos puestos.
+                    console.log("Logout manual detectado: Datos completados, esperando clic.");
+                } else {
+                    // Si la app se cerró sola o el token venció, intentamos entrar de una.
+                    console.log("Autologin: Entrando automáticamente...");
+                    await intentarLogin(savedUser, savedPass);
+                }
             }
         }, 500); 
     }
@@ -102,8 +115,7 @@ async function fetchConAuth(url, options = {}) {
 
 function cerrarSesion() {
     localStorage.removeItem("token");
-    localStorage.removeItem("chat_user");
-    localStorage.removeItem("chat_pass");
+    localStorage.setItem("manual_logout", "true"); // <-- Agregá esto
     if (socket) socket.close();
     location.reload();
 }
